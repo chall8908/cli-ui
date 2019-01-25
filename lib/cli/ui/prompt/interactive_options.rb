@@ -96,17 +96,31 @@ module CLI
 
           # since lines may be longer than the terminal is wide, we need to
           # determine how many extra lines would be taken up by them
-          max_width = (CLI::UI::Terminal.width -
-                       options.count.to_s.size - # Width of the displayed number
-                       5 -                       # Extra characters added during rendering
-                       (@multiple ? 1 : 0)       # Space for the checkbox, if rendered
-                      ).to_f
+          max_width = CLI::UI::Terminal.width.to_f
+
+          # The first line is a little shorter than the subsequent lines to
+          # account for the numbers and pointer
+          first_line_width = (max_width -
+                              options.count.to_s.size - # Width of the displayed number
+                              5 -                       # Extra characters added during rendering
+                              (@multiple ? 1 : 0)       # Space for the checkbox, if rendered
+                             )
 
           total_non_empty_lines = options
                                     .join("\n")
                                     .split("\n")
                                     .reject(&:empty?)
-                                    .map { |l| (l.length / max_width).ceil }
+                                    .map do |line|
+                                      # Calculate only the printable width so that the
+                                      # color codes don't mess up the calculation
+                                      printable_width = ANSI.printing_width(line)
+
+                                      next 1 if printable_width <= first_line_width
+
+                                      remaining_width = printable_width - first_line_width
+
+                                      1 + (remaining_width / max_width).ceil
+                                    end
                                     .reduce(&:+)
 
           total_non_empty_lines + empty_option_count
